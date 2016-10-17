@@ -26,14 +26,6 @@ HEADERS += \
 
 DEFINES += SFML_STATIC
 
-
-LIBS += -L$$PWD/SFML-win32/lib
-
-INCLUDEPATH += $$PWD/SFML-win32/include
-
-DEPENDPATH += $$PWD/SFML-win32/include
-
-
 LIBS += -L$$PWD/SFML-win32/lib
 
 INCLUDEPATH += $$PWD/SFML-win32/include
