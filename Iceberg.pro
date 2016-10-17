@@ -26,6 +26,20 @@ HEADERS += \
 
 DEFINES += SFML_STATIC
 
+win32:contains(QMAKE_HOST.arch, x86_64) {
+    LIBS += -L$$PWD/SFML-win64/lib
+
+    INCLUDEPATH += $$PWD/SFML-win64/include
+
+    DEPENDPATH += $$PWD/SFML-win64/include
+} else {
+    LIBS += -L$$PWD/SFML-win32/lib
+
+    INCLUDEPATH += $$PWD/SFML-win32/include
+
+    DEPENDPATH += $$PWD/SFML-win32/include
+}
+
 LIBS += -L$$PWD/SFML-win32/lib
 
 INCLUDEPATH += $$PWD/SFML-win32/include
