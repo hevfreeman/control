@@ -1,14 +1,62 @@
 #include "server.h"
 
+
 const int MAX_COM_ID = 42;
+const int MAX_JOYSTICK_ID = 13;
+unsigned int DEPTH_BUTTON_ID = 6;
+
+int MIN_ENGINE_POWER = 0;
+int MAX_ENGINE_POWER = 256;
+
+
+// Стандартный для SFML диапазон значений, читаемых с джойстика
+float MIN_JOYSTICK_VALUE = -100.;
+float MAX_JOYSTICK_VALUE =  100.;
+
+
+// Диапазон значений, отправляемых на движки
+int MIN_VALUE = -255;
+int MAX_VALUE = 255;
+
 
 Server::Server(QObject *parent) : QObject(parent)
 {
     sendTimer = new QTimer(this);
     connect(sendTimer, SIGNAL(timeout()), this, SLOT( sendMessage() ));
+
     newPort = 0;
-    nextMessageType = 0xFF;
-    currentMessageType = 0xFF;
+
+    bool flag = false;
+    for (int i = 0; i < MAX_JOYSTICK_ID; ++i) {
+        if (j.init(i)) {
+            flag = true;
+            break;
+        }
+    }
+    if (!flag)
+        std::cout << "No joystick found among ids from 0 to " << MAX_JOYSTICK_ID-1 << std::endl;
+    else
+        std::cout << "Joystick connected" << std::endl;
+
+    j.update();
+}
+
+Server::~Server() {
+    std::cout << "Server shutting down..." << std::endl;
+    if (newPort && newPort->isOpen()) {
+        std::cout << "Stopping motors.." << std::endl;
+        uint8_t msg_to_send[REQUEST_MESSAGE_LENGTH];
+        for (int i = 0; i < REQUEST_MESSAGE_LENGTH; ++i) {
+            msg_to_send[i] = 0x00;
+        }
+        addCheckSumm16b(msg_to_send, REQUEST_MESSAGE_LENGTH);
+        newPort->write((char*)msg_to_send, REQUEST_MESSAGE_LENGTH);
+        std::cout << "Success" << std::endl;
+        std::cout << "Closing port" << std::endl;
+        newPort->close();
+        newPort->deleteLater();
+    }
+    std::cout << "Goodbye!" << std::endl;
 }
 
 bool Server::COMconnect(int com_num)
@@ -32,7 +80,6 @@ bool Server::COMconnect(int com_num)
         openFlag = newPort->open(QIODevice::ReadWrite);
     } catch(...) {
         std::cout << "Serial port openning error" << std::endl;
-        emit info("Serial port openning error");
         return false;
     }
 
@@ -41,332 +88,136 @@ bool Server::COMconnect(int com_num)
         sendTimer->start(REQUEST_DELAY);
     } else {
         std::cout << "Cannot open serial port" << std::endl;
-        emit info("Cannot open serial port");
         return false;
     }
     return true;
 }
 
-
-void Server::sendMessage() {
-    if (currentMessageType != nextMessageType)
-        currentMessageType = nextMessageType;
-    switch (currentMessageType) {
-    case REQUEST_NORMAL_CODE:
-        sendMessageNormal();
-        break;
-    case REQUEST_CONFIG_CODE:
-        sendMessageConfig();
-        break;
-    case REQUEST_DIRECT_CODE:
-        sendMessageDirect();
-        break;
-    default:
-        std::cout << "Unknown current message code!" << std::endl;
-    }
-}
-
-void Server::sendMessageNormal()
+void Server::sendMessage()
 {
-    for (int i = 0; i < REQUEST_NORMAL_LENGTH; ++i) {
+    uint8_t msg_to_send[REQUEST_MESSAGE_LENGTH];
+    for (int i = 0; i < REQUEST_MESSAGE_LENGTH; ++i) {
         msg_to_send[i] = 0x00;
     }
 
-    j->update();
 
-    msg_to_send[REQUEST_NORMAL_TYPE] = REQUEST_NORMAL_CODE;
+    int16_t pitch = 0;
+    int16_t roll = 0;
+    int16_t yaw = 0;
 
-    msg_to_send[REQUEST_NORMAL_MARCH+1] = j->march;
-    msg_to_send[REQUEST_NORMAL_MARCH] = j->march >> 8;
+    int16_t front = 0;
+    int16_t side = 0;
+    int16_t depth = 0;
 
-    msg_to_send[REQUEST_NORMAL_LAG+1] = j->lag;
-    msg_to_send[REQUEST_NORMAL_LAG] = j->lag >> 8;
+    int8_t light = 0;
+    int8_t grab = 0;
 
-    msg_to_send[REQUEST_NORMAL_DEPTH+1] = j->depth;
-    msg_to_send[REQUEST_NORMAL_DEPTH] = j->depth >> 8;
+    sensitivity = 0;
+    //int8_t sensitivity = 0;
 
-    msg_to_send[REQUEST_NORMAL_ROLL+1] = j->roll;
-    msg_to_send[REQUEST_NORMAL_ROLL] = j->roll >> 8;
+    if (!overrideAllSettings) {
+        j.update();
+        pitch = translateCoords(j.axis_pitch, MIN_JOYSTICK_VALUE, MAX_JOYSTICK_VALUE,  MIN_VALUE,  MAX_VALUE);
+        roll  = translateCoords(j.axis_roll,  MIN_JOYSTICK_VALUE, MAX_JOYSTICK_VALUE,  MIN_VALUE,  MAX_VALUE);
+        yaw   = translateCoords(j.axis_yaw,   MIN_JOYSTICK_VALUE, MAX_JOYSTICK_VALUE,  MIN_VALUE,  MAX_VALUE);
 
-    msg_to_send[REQUEST_NORMAL_PITCH+1] = j->pitch;
-    msg_to_send[REQUEST_NORMAL_PITCH] = j->pitch >> 8;
+        front = translateCoords(j.axis_front, MIN_JOYSTICK_VALUE, MAX_JOYSTICK_VALUE, MIN_VALUE, MAX_VALUE);
+        side  = translateCoords(j.axis_side,  MIN_JOYSTICK_VALUE, MAX_JOYSTICK_VALUE, MIN_VALUE, MAX_VALUE);
+        depth = translateCoords(j.axis_depth, MIN_JOYSTICK_VALUE, MAX_JOYSTICK_VALUE, MAX_VALUE,         0);
 
-    msg_to_send[REQUEST_NORMAL_YAW+1] = j->yaw;
-    msg_to_send[REQUEST_NORMAL_YAW] = j->yaw >> 8;
+        light  = translateCoords(j.axis_light, MIN_JOYSTICK_VALUE, MAX_JOYSTICK_VALUE, 0, 63);
+        sensitivity = translateCoords(j.axis_sensitivity, MIN_JOYSTICK_VALUE, MAX_JOYSTICK_VALUE, (float)0, (float)2);
+        if (j.btn_depth_inv)
+            depth = -depth;
 
+        if      (j.btn_ungrab)
+            grab = -200;
+        else if (j.btn_grab_strong)
+            grab = 200;
+        else if (j.btn_grab)
+            grab = 200;
+        else
+            grab = 0;
 
-    msg_to_send[REQUEST_NORMAL_LIGHT]      = j->light;
-    msg_to_send[REQUEST_NORMAL_GRAB]       = j->grab;
-    msg_to_send[REQUEST_NORMAL_TILT]       = j->tilt;
-    msg_to_send[REQUEST_NORMAL_GRAB2_ROTATE] = j->grab2_rotate;
-    msg_to_send[REQUEST_NORMAL_GRAB2_SQUEEZE] = j->grab2_squeeze;
+        std::cout << "pitch=" << pitch << " roll=" << roll << " yaw="   << yaw   << std::endl;
+        std::cout << "front=" << front << " side=" << side << " depth=" << depth << std::endl;
+        std::cout << "light=" << static_cast<int16_t>(light)
+                  << " grub=" << static_cast<int16_t>(grab)
+                  << " sensitivity= " << sensitivity
+                  << std::endl;
 
-    msg_to_send[REQUEST_NORMAL_STABILIZE_DEPTH] = false;
-    msg_to_send[REQUEST_NORMAL_STABILIZE_ROLL] = false;
-    msg_to_send[REQUEST_NORMAL_STABILIZE_PITCH] = false;
-    msg_to_send[REQUEST_NORMAL_STABILIZE_YAW] = false;
-    msg_to_send[REQUEST_NORMAL_RESET_IMU] = false;
+        m.HLB = round((+ front + side - yaw)/3);
+        m.HLF = round((- front + side + yaw)/3);
+        m.HRB = round((+ front - side + yaw)/3);
+        m.HRF = round((- front - side - yaw)/3);
 
-    addCheckSumm16b(msg_to_send, REQUEST_NORMAL_LENGTH);
+        m.VB  = round((- depth + 0    + pitch));
+        m.VF  = round((+ depth + 0    + pitch));
+        m.VL  = round((- depth + roll + 0    ));
+        m.VR  = round((- depth - roll + 0    ));
 
+        std::cout << "HLB= " << m.HLB << std::endl;
+        std::cout << "HLF= " << m.HLF << std::endl;
+        std::cout << "HRB= " << m.HRB << std::endl;
+        std::cout << "HRF= " << m.HRF << std::endl;
 
-    std::cout << "Sending NORMAL message:" << std::endl;
-    for (int i = 0; i < REQUEST_NORMAL_LENGTH; ++i) {
-        std::cout << "|N" << i << "=" << unsigned(msg_to_send[i]) << std::endl;
+        std::cout << "VB = " << m.VB  << std::endl;
+        std::cout << "VF = " << m.VF  << std::endl;
+        std::cout << "VL = " << m.VL  << std::endl;
+        std::cout << "VR = " << m.VR  << std::endl;
+    } else {
+        light = 0;
+        grab = 0;
+
+        pitch = 0;
+        roll = 0;
+        yaw = 0;
+
+        front = 0;
+        side = 0;
+        depth = 0;
     }
 
-    newPort->write((char*)msg_to_send, REQUEST_NORMAL_LENGTH);
 
-    emit imSleeping();
-    QTest::qSleep (REQUEST_TIMEOUT);
-    receiveMessage();
-}
+    msg_to_send[NORMAL_MODE_MESSAGE_GRUB1]      = light;
+    msg_to_send[NORMAL_MODE_MESSAGE_LIGHT]      = grab;
+    msg_to_send[NORMAL_MODE_MESSAGE_FLAGS1]     = 0x0f;
+    msg_to_send[NORMAL_MODE_MESSAGE_FLAGS2]     = 0xf0;
 
-void Server::sendMessageDirect() {
-    for (int i = 0; i < REQUEST_DIRECT_LENGTH; ++i) {
-        msg_to_send[i] = 0x00;
-    }
-
-    msg_to_send[REQUEST_DIRECT_TYPE] = REQUEST_DIRECT_CODE;
-    //addSNP(msg_to_send);
-
-    msg_to_send[REQUEST_DIRECT_1] = settings->motors[0].speed;
-    msg_to_send[REQUEST_DIRECT_2] = settings->motors[1].speed;
-    msg_to_send[REQUEST_DIRECT_3] = settings->motors[2].speed;
-    msg_to_send[REQUEST_DIRECT_4] = settings->motors[3].speed;
-    msg_to_send[REQUEST_DIRECT_5] = settings->motors[4].speed;
-    msg_to_send[REQUEST_DIRECT_6] = settings->motors[5].speed;
-    msg_to_send[REQUEST_DIRECT_7] = settings->motors[6].speed;
-    msg_to_send[REQUEST_DIRECT_8] = settings->motors[7].speed;
-
-    addCheckSumm16b(msg_to_send, REQUEST_DIRECT_LENGTH);
-
-    std::cout << "Sending DIRECT message:" << std::endl;
-    for (int i = 0; i < REQUEST_DIRECT_LENGTH; ++i) {
-        std::cout << "|N" << i << "=" << unsigned(msg_to_send[i]) << std::endl;
-    }
-
-    newPort->write((char*)msg_to_send, REQUEST_DIRECT_LENGTH);
-
-    emit imSleeping();
-    QTest::qSleep (REQUEST_TIMEOUT);
-    receiveMessage();
-}
-
-void Server::sendMessageConfig() {
-    for (int i = 0; i < REQUEST_CONFIG_LENGTH; ++i) {
-        msg_to_send[i] = 0x00;
-    }
-
-    //addSNP(msg_to_send);
-    msg_to_send[REQUEST_CONFIG_TYPE] = REQUEST_CONFIG_CODE;
-
-    msg_to_send[REQUEST_CONFIG_CONST_TIME_DEPTH]    = settings->depth.const_time;
-    msg_to_send[REQUEST_CONFIG_K1_DEPTH]            = settings->depth.k1;
-    msg_to_send[REQUEST_CONFIG_K2_DEPTH]            = settings->depth.k2;
-    msg_to_send[REQUEST_CONFIG_START_DEPTH]         = settings->depth.start;
-    msg_to_send[REQUEST_CONFIG_GAIN_DEPTH]          = settings->depth.gain;
-
-    msg_to_send[REQUEST_CONFIG_CONST_TIME_ROLL]     = settings->roll.const_time;
-    msg_to_send[REQUEST_CONFIG_K1_ROLL]             = settings->roll.k1;
-    msg_to_send[REQUEST_CONFIG_K2_ROLL]             = settings->roll.k2;
-    msg_to_send[REQUEST_CONFIG_START_ROLL]          = settings->roll.start;
-    msg_to_send[REQUEST_CONFIG_GAIN_ROLL]           = settings->roll.gain;
-
-    msg_to_send[REQUEST_CONFIG_CONST_TIME_PITCH]    = settings->pitch.const_time;
-    msg_to_send[REQUEST_CONFIG_K1_PITCH]            = settings->pitch.k1;
-    msg_to_send[REQUEST_CONFIG_K2_PITCH]            = settings->pitch.k2;
-    msg_to_send[REQUEST_CONFIG_START_PITCH]         = settings->pitch.start;
-    msg_to_send[REQUEST_CONFIG_GAIN_PITCH]          = settings->pitch.gain;
-
-    msg_to_send[REQUEST_CONFIG_CONST_TIME_YAW]      = settings->yaw.const_time;
-    msg_to_send[REQUEST_CONFIG_K1_YAW]              = settings->yaw.k1;
-    msg_to_send[REQUEST_CONFIG_K2_YAW]              = settings->yaw.k2;
-    msg_to_send[REQUEST_CONFIG_START_YAW]           = settings->yaw.start;
-    msg_to_send[REQUEST_CONFIG_GAIN_YAW]            = settings->yaw.gain;
-
-    settings->motors;
 
     for (int i = 0; i < 8; ++i) {
-        switch (settings->motors[i].code) {
-        case settings->motors[i].HLB:
-            msg_to_send[REQUEST_CONFIG_POSITION_HLB] = i;
-            msg_to_send[REQUEST_CONFIG_INVERSE_HLB]  = settings->motors[i].inverse;
-            if (settings->motors[i].enabled) {
-                addFloat(msg_to_send, REQUEST_CONFIG_K_BACKWARD_HLB, settings->motors[i].k_backward);
-                addFloat(msg_to_send, REQUEST_CONFIG_K_FORWARD_HLB,  settings->motors[i].k_forward);
-            } else {
-                addFloat(msg_to_send, REQUEST_CONFIG_K_BACKWARD_HLB, 0.0);
-                addFloat(msg_to_send, REQUEST_CONFIG_K_FORWARD_HLB,  0.0);
-            }
-            break;
-        case settings->motors[i].HLF:
-            msg_to_send[REQUEST_CONFIG_POSITION_HLF] = i;
-            msg_to_send[REQUEST_CONFIG_INVERSE_HLF]  = settings->motors[i].inverse;
-            if (settings->motors[i].enabled) {
-                addFloat(msg_to_send, REQUEST_CONFIG_K_BACKWARD_HLF, settings->motors[i].k_backward);
-                addFloat(msg_to_send, REQUEST_CONFIG_K_FORWARD_HLF,  settings->motors[i].k_forward);
-            } else {
-                addFloat(msg_to_send, REQUEST_CONFIG_K_BACKWARD_HLF, 0.0);
-                addFloat(msg_to_send, REQUEST_CONFIG_K_FORWARD_HLF,  0.0);
-            }
-            break;
-        case settings->motors[i].HRB:
-            msg_to_send[REQUEST_CONFIG_POSITION_HRB] = i;
-            msg_to_send[REQUEST_CONFIG_INVERSE_HRB]  = settings->motors[i].inverse;
-            if (settings->motors[i].enabled) {
-                addFloat(msg_to_send, REQUEST_CONFIG_K_BACKWARD_HRB, settings->motors[i].k_backward);
-                addFloat(msg_to_send, REQUEST_CONFIG_K_FORWARD_HRB,  settings->motors[i].k_forward);
-            } else {
-                addFloat(msg_to_send, REQUEST_CONFIG_K_BACKWARD_HRB, 0.0);
-                addFloat(msg_to_send, REQUEST_CONFIG_K_FORWARD_HRB,  0.0);
-            }
-            break;
-        case settings->motors[i].HRF:
-            msg_to_send[REQUEST_CONFIG_POSITION_HRF] = i;
-            msg_to_send[REQUEST_CONFIG_INVERSE_HRF]  = settings->motors[i].inverse;
-            if (settings->motors[i].enabled) {
-                addFloat(msg_to_send, REQUEST_CONFIG_K_BACKWARD_HRF, settings->motors[i].k_backward);
-                addFloat(msg_to_send, REQUEST_CONFIG_K_FORWARD_HRF,  settings->motors[i].k_forward);
-            } else {
-                addFloat(msg_to_send, REQUEST_CONFIG_K_BACKWARD_HRF, 0.0);
-                addFloat(msg_to_send, REQUEST_CONFIG_K_FORWARD_HRF,  0.0);
-            }
-            break;
-        case settings->motors[i].VB:
-            msg_to_send[REQUEST_CONFIG_POSITION_VB] = i;
-            msg_to_send[REQUEST_CONFIG_INVERSE_VB]  = settings->motors[i].inverse;
-            if (settings->motors[i].enabled) {
-                addFloat(msg_to_send, REQUEST_CONFIG_K_BACKWARD_VB, settings->motors[i].k_backward);
-                addFloat(msg_to_send, REQUEST_CONFIG_K_FORWARD_VB,  settings->motors[i].k_forward);
-            } else {
-                addFloat(msg_to_send, REQUEST_CONFIG_K_BACKWARD_VB, 0.0);
-                addFloat(msg_to_send, REQUEST_CONFIG_K_FORWARD_VB,  0.0);
-            }
-            break;
-        case settings->motors[i].VF:
-            msg_to_send[REQUEST_CONFIG_POSITION_VF] = i;
-            msg_to_send[REQUEST_CONFIG_INVERSE_VF]  = settings->motors[i].inverse;
-            if (settings->motors[i].enabled) {
-                addFloat(msg_to_send, REQUEST_CONFIG_K_BACKWARD_VF, settings->motors[i].k_backward);
-                addFloat(msg_to_send, REQUEST_CONFIG_K_FORWARD_VF,  settings->motors[i].k_forward);
-            } else {
-                addFloat(msg_to_send, REQUEST_CONFIG_K_BACKWARD_VF, 0.0);
-                addFloat(msg_to_send, REQUEST_CONFIG_K_FORWARD_VF,  0.0);
-            }
-            break;
-        case settings->motors[i].VL:
-            msg_to_send[REQUEST_CONFIG_POSITION_VL] = i;
-            msg_to_send[REQUEST_CONFIG_INVERSE_VL]  = settings->motors[i].inverse;
-            if (settings->motors[i].enabled) {
-                addFloat(msg_to_send, REQUEST_CONFIG_K_BACKWARD_VL, settings->motors[i].k_backward);
-                addFloat(msg_to_send, REQUEST_CONFIG_K_FORWARD_VL,  settings->motors[i].k_forward);
-            } else {
-                addFloat(msg_to_send, REQUEST_CONFIG_K_BACKWARD_VL, 0.0);
-                addFloat(msg_to_send, REQUEST_CONFIG_K_FORWARD_VL,  0.0);
-            }
-            break;
-        case settings->motors[i].VR:
-            msg_to_send[REQUEST_CONFIG_POSITION_VR] = i;
-            msg_to_send[REQUEST_CONFIG_INVERSE_VR]  = settings->motors[i].inverse;
-            if (settings->motors[i].enabled) {
-                addFloat(msg_to_send, REQUEST_CONFIG_K_BACKWARD_VR, settings->motors[i].k_backward);
-                addFloat(msg_to_send, REQUEST_CONFIG_K_FORWARD_VR,  settings->motors[i].k_forward);
-            } else {
-                addFloat(msg_to_send, REQUEST_CONFIG_K_BACKWARD_VR, 0.0);
-                addFloat(msg_to_send, REQUEST_CONFIG_K_FORWARD_VR,  0.0);
-            }
-            break;
-        default:
-            std::cout << "ERROR: unknown motor code!" << std::endl;
-        }
-
+        writeMotor(motors[i], msg_to_send);
     }
 
-    addCheckSumm16b(msg_to_send, REQUEST_CONFIG_LENGTH);
+    addCheckSumm16b(msg_to_send, REQUEST_MESSAGE_LENGTH);
 
-    std::cout << "Sending CONFIG message:" << std::endl;
-    for (int i = 0; i < REQUEST_CONFIG_LENGTH; ++i) {
+
+    /*for (int i = 0; i < REQUEST_MESSAGE_LENGTH; ++i) {
         std::cout << "|N" << i << "=" << unsigned(msg_to_send[i]) << std::endl;
-    }
+    }*/
 
-    newPort->write((char*)msg_to_send, REQUEST_CONFIG_LENGTH);
+    newPort->write((char*)msg_to_send, REQUEST_MESSAGE_LENGTH);
 
-    emit imSleeping();
     QTest::qSleep (REQUEST_TIMEOUT);
-    receiveMessage();
+
+    ///////////////////////////////////////////////////////////////////RECEIVING MESSAGE HERE//////////////////////////////////////////////////////////////////
+    if (newPort->bytesAvailable()){
+        QByteArray msg_in = newPort->readAll();
+        std::cout << "Got response " << msg_in[0] << std::endl;
+    }
+    //////////////////////////////////////////////////////////////////END OF RECEIVING MESSAGE/////////////////////////////////////////////////////////////////
 }
 
-
-
-
-
-void Server::receiveMessage() {
-    int buffer_size = newPort->bytesAvailable();
-    std::cout << "In input buffer there are " << buffer_size << " bytes availible" << std::endl;
-    if (buffer_size == 0)
-        std::cout << "No message to read. Buffer is empty" << std::endl;
-    else if (buffer_size != RESPONSE_LENGTH) {
-        std::cout << "Wrong response message size! Got " << buffer_size << ", when " << RESPONSE_LENGTH << " expected." << std::endl;
-        newPort->readAll();
-    } else {
-        msg_in = newPort->readAll();
-
-        std::cout << "Got response. First symbol: " << msg_in[0] << std::endl;
-        std::cout << "Checksum...";
-
-        if (isCheckSumm16bCorrect((uint8_t*) msg_in.data(), RESPONSE_LENGTH)) {
-            std::cout << "OK" << std::endl;
-        } else {
-            std::cout << "INCORRECT!" << std::endl;
-            return;
-        }
-
-        int16_t roll = msg_in[RESPONSE_ROLL];
-        int16_t pitch = msg_in[RESPONSE_PITCH];
-        int16_t yaw = msg_in[RESPONSE_YAW];
-
-        int16_t roll_speed = msg_in[RESPONSE_ROLL_SPEED];
-        int16_t pitch_speed = msg_in[RESPONSE_PITCH_SPEED];
-        int16_t yaw_speed = msg_in[RESPONSE_YAW_SPEED];
-
-        uint8_t temperature_MS = msg_in[RESPONSE_TEMPERATURE];
-        uint8_t temperature_LS = msg_in[RESPONSE_TEMPERATURE+1];
-
-        temperature = encodeTemperature(temperature_MS, temperature_LS);
-
-        int16_t pressure = msg_in[RESPONSE_PRESSURE];
-
-        uint16_t motor_errors = msg_in[RESPONSE_MOTOR_ERRORS];
-
-        std::cout << "Received  data:" << std::endl;
-        std::cout << "roll" << roll << "pitch" << pitch << "yaw" << yaw << std::endl;
-        std::cout << "roll_speed" << roll_speed << "pitch_speed" << pitch_speed << "yaw_speed" << yaw_speed << std::endl;
-        std::cout << "temperature=" << temperature << " pressure=" << pressure << std::endl;
-        std::cout << "motor_errors" << motor_errors << std::endl;
-    }
+int16_t Server::translateCoords(float joy, float from_start, float from_end, int to_start, int to_end) {
+    float val_from_zero_to_one = (joy - from_start) / (from_end - from_start);
+    float ans = val_from_zero_to_one * (to_end - to_start) + to_start;
+    return round(ans);
 }
 
-
-/* CRC16-CCITT algorithm */
-uint8_t Server::isCheckSumm16bCorrect(uint8_t * msg, uint16_t length)
-{
-    uint16_t crcGot, crc = 0;
-    int i;
-
-    crcGot = (uint16_t)( msg[length-1] + (msg[length-2] << 8) );
-
-    for(i=0; i < length - 2; i++){
-        crc = (uint8_t)(crc >> 8) | (crc << 8);
-        crc ^= msg[i];
-        crc ^= (uint8_t)(crc & 0xff) >> 4;
-        crc ^= (crc << 8) << 4;
-        crc ^= ((crc & 0xff) << 4) << 1;
-    }
-
-    if(crc == crcGot )
-        return 1;
-    else return 0;
+float Server::translateCoords(float joy, float from_start, float from_end, float to_start, float to_end) {
+    float val_from_zero_to_one = (joy - from_start) / (from_end - from_start);
+    float ans = val_from_zero_to_one * (to_end - to_start) + to_start;
+    return ans;
 }
 
 void Server::addCheckSumm16b(uint8_t * msg, uint16_t length)
@@ -386,20 +237,78 @@ void Server::addCheckSumm16b(uint8_t * msg, uint16_t length)
     msg[length-1] = (uint8_t) crc;
 }
 
-void Server::addFloat(uint8_t * msg, int position, float value) {
-    memcpy(msg + position, (unsigned char*) (&value), 4);
+
+
+void Server::setControl(bool gui)
+{
+    overrideAllSettings = gui;
 }
 
 
-void Server::connect_fake() {
-    std::cout << "Warning! Overriding COM port!" << std::endl;
-    newPort = new QSerialPort();
+void Server::writeMotor(Motor motor, uint8_t * msg_to_send) {
+    int adress = 18 + motor.adress*2;
+    int16_t speed = 0;
 
-    sendTimer->start(300);
+    if (!motor.enabled) {
+        msg_to_send[adress] = 0;
+        std::cout << motor.getCode().toStdString()  << " motor is not enabled" << std::endl;
+        return;
+    }
+
+    if (overrideAllSettings) {
+        speed = motor.speed;
+    } else {
+        switch (motor.code) {
+        case motor.HLB:
+            speed = m.HLB;
+            break;
+        case motor.HLF:
+            speed = m.HLF;
+            break;
+        case motor.HRB:
+            speed = m.HRB;
+            break;
+        case motor.HRF:
+            speed = m.HRF;
+            break;
+        case motor.VB:
+            speed = m.VB;
+            break;
+        case motor.VF:
+            speed = m.VF;
+            break;
+        case motor.VL:
+            speed = m.VL;
+            break;
+        case motor.VR:
+            speed = m.VR;
+            break;
+        }
+
+        speed = round(speed*sensitivity);
+
+        if (speed < 0) {
+            speed = round(speed * motor.k_backward);
+        } else if (speed > 0) {
+            speed = round(speed * motor.k_forward);
+        }
+
+        if (motor.inverse)
+            speed = -speed;        
+    }
+
+    msg_to_send[adress+1] = speed;
+    msg_to_send[adress] = speed >> 8;
 }
+
+
 
 void Server::connect_com()
 {
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //std::cout << "Warning! Overriding COM port!" << std::endl;
+
+    sendTimer->start(300);
     for (int i = 0; i < MAX_COM_ID; ++i) {
         if (COMconnect(i)){
             break;
@@ -409,58 +318,6 @@ void Server::connect_com()
 
 void Server::disconnect_com() {
     std::cout << "Disconnecting" << std::endl;
-    sendTimer->stop();
-    newPort->disconnect();
-    newPort->close();
-    newPort->deleteLater();
 }
 
-void Server::addSNP(uint8_t * msg) {
-    msg[0] = 'S';
-    msg[1] = 'N';
-    msg[2] = 'P';
-}
-
-float Server::encodeTemperature(uint8_t MS, uint8_t LS) {
-    uint8_t sign_bytes = MS >> 3;
-    int sign = 0;
-    if (sign_bytes == 0) {
-        sign = -1;
-    } else {
-        sign = 1;
-    }
-    int integer_part = ((MS << 5) >> 1) + (LS >> 4);
-    float temperature = 0;
-    uint8_t bit_power_minus_1 = LS & 0b00001000;
-    uint8_t bit_power_minus_2 = LS & 0b00000100;
-    uint8_t bit_power_minus_3 = LS & 0b00000010;
-    uint8_t bit_power_minus_4 = LS & 0b00000001;
-    temperature += integer_part;
-    if (bit_power_minus_1) {
-        temperature += 0.5;
-        std::cout << "1/2 DETECTED!!!11" << std::endl;
-    }
-    if (bit_power_minus_2) temperature += 0.25;
-    if (bit_power_minus_3) temperature += 0.125;
-    if (bit_power_minus_4) temperature += 0.0625;
-    return temperature;
-}
-
-Server::~Server() {
-    std::cout << "Server shutting down..." << std::endl;
-    if (newPort && newPort->isOpen()) {
-        std::cout << "Stopping motors.." << std::endl;
-        uint8_t msg_to_send[REQUEST_NORMAL_LENGTH];
-        for (int i = 0; i < REQUEST_NORMAL_LENGTH; ++i) {
-            msg_to_send[i] = 0x00;
-        }
-        addCheckSumm16b(msg_to_send, REQUEST_NORMAL_LENGTH);
-        newPort->write((char*)msg_to_send, REQUEST_NORMAL_LENGTH);
-        std::cout << "Success" << std::endl;
-        std::cout << "Closing port" << std::endl;
-        newPort->close();
-        newPort->deleteLater();
-    }
-    std::cout << "Goodbye!" << std::endl;
-}
 

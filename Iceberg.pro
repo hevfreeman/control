@@ -1,6 +1,5 @@
 QT += core serialport testlib
 QT += gui widgets
-QT += svg
 
 TARGET = IcebergNOGUI
 CONFIG += console
@@ -13,16 +12,18 @@ SOURCES += main.cpp \
     server.cpp \
     mainwindow.cpp \
     joystick.cpp \
+    motor.cpp \
     settings.cpp \
-    qfi_PFD.cpp
+    dialog.cpp
 
 HEADERS += \
     server.h \
     messages.h \
     mainwindow.h \
     joystick.h \
+    motor.h \
     settings.h \
-    qfi_PFD.h
+    dialog.h
 
 DEFINES += SFML_STATIC
 
@@ -37,7 +38,4 @@ CONFIG(debug, debug|release): LIBS += -lsfml-window-d
 
 FORMS += \
     mainwindow.ui \
-    WidgetPFD.ui
-
-RESOURCES += \
-    qfi.qrc
+    dialog.ui

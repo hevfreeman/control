@@ -9,43 +9,27 @@ class Joystick : public QObject
 {
     Q_OBJECT
 public:
-    int16_t pitch       = 0;     //[-32767,32767]
-    int16_t roll        = 0;     //[-32767,32767]
-    int16_t yaw         = 0;     //[-32767,32767]
+    float axis_pitch       = 0.0;
+    float axis_roll        = 0.0;
+    float axis_yaw         = 0.0;
 
-    int16_t march       = 0;     //[-32767,32767]
-    int16_t lag         = 0;     //[-32767,32767]
-    int16_t depth       = 0;     //[-32767,32767]
+    float axis_front       = 0.0;
+    float axis_side        = 0.0;
+    float axis_depth       = 0.0;
 
-    int8_t light       = 0;     //[0,127]
-    int8_t grab        = 0;     //[-127,127]
-    int8_t tilt        = 0;     //[-127,127]
-
-    int8_t grab2_squeeze = 0;   //[-127, 127]
-    int8_t grab2_rotate  = 0;   //[-127, 127]
-
-    float sensitivity = 0.0;       //[0.0,2.0]
-
+    float axis_light       = 0.0;
+    float axis_sensitivity = 0.0;
 
     bool btn_depth_inv   = false;  // 6
     bool btn_grab        = false;  // 0
     bool btn_grab_strong = false;  // 14
     bool btn_ungrab      = false;  // 5
 
-    bool btn_grab2_squeeze = false;                 //19
-    bool btn_grab2_unsqueeze = false;               //21
-    bool btn_grab2_rotate_clockwise = false;        //20
-    bool btn_grab2_rotate_counterclockwise = false; //22
-
-    bool isControlJoystick = true;
-    bool isControlKeyboard = false;
-    bool isControlXbox     = false;
 
     explicit Joystick(QObject *parent = 0);
     bool init(int joystick_id);
-    void update();    
+    void update();
     void printButtons();
-    void printAxises();
 
 private:
     const int SFML_BTN_DEPTH_INV   = 6;
@@ -53,16 +37,8 @@ private:
     const int SFML_BTN_GRAB_STRONG = 14;
     const int SFML_BTN_UNGRAB      = 5;
 
-    const int SFML_BTN_GRAB2_SQUEEZE                 = 19;
-    const int SFML_BTN_GRAB2_UNSQUEEZE               = 21;
-    const int SFML_BTN_GRAB2_ROTATE_CLOCKWISE        = 20;
-    const int SFML_BTN_GRAB2_ROTATE_COUNTERCLOCKWISE = 22;
-
     int joystick_id = 0;
 
-    void updateJoystick();
-    void updateKeyboard();
-    void updateXbox();
 
 
 signals:

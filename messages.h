@@ -1,133 +1,95 @@
-#define REQUEST_NORMAL_CODE             0xFF
+#define REQUEST_MESSAGE_LENGTH			36
 
-#define REQUEST_NORMAL_LENGTH           25
-
-#define REQUEST_NORMAL_TYPE             0
-#define REQUEST_NORMAL_MARCH            1
-#define REQUEST_NORMAL_LAG              3
-#define REQUEST_NORMAL_DEPTH            5
-#define REQUEST_NORMAL_ROLL             7
-#define REQUEST_NORMAL_PITCH            9
-#define REQUEST_NORMAL_YAW              11
-
-#define REQUEST_NORMAL_LIGHT            13
-#define REQUEST_NORMAL_GRAB             14
-#define REQUEST_NORMAL_GRAB2_SQUEEZE    15
-#define REQUEST_NORMAL_GRAB2_ROTATE     16
-#define REQUEST_NORMAL_TILT             17
-
-#define REQUEST_NORMAL_STABILIZE_DEPTH  18
-#define REQUEST_NORMAL_STABILIZE_ROLL   19
-#define REQUEST_NORMAL_STABILIZE_PITCH  20
-#define REQUEST_NORMAL_STABILIZE_YAW    21
-#define REQUEST_NORMAL_RESET_IMU        22
-
-#define REQUEST_NORMAL_CHECKSUM         23
-
-
-
-
-#define REQUEST_DIRECT_CODE             0xAA
-
-#define REQUEST_DIRECT_LENGTH           11
-
-#define REQUEST_DIRECT_TYPE             0
-#define REQUEST_DIRECT_1                1
-#define REQUEST_DIRECT_2                2
-#define REQUEST_DIRECT_3                3
-#define REQUEST_DIRECT_4                4
-#define REQUEST_DIRECT_5                5
-#define REQUEST_DIRECT_6                6
-#define REQUEST_DIRECT_7                7
-#define REQUEST_DIRECT_8                8
-#define REQUEST_DIRECT_CHECKSUM         9
+#define NORMAL_MODE_MESSAGE_YAW                             0
+#define NORMAL_MODE_MESSAGE_PITCH							2
+#define NORMAL_MODE_MESSAGE_MARCH							4
+#define NORMAL_MODE_MESSAGE_LOG								6
+#define NORMAL_MODE_MESSAGE_DEPTH							8
+#define NORMAL_MODE_MESSAGE_GRUB1							10
+#define NORMAL_MODE_MESSAGE_GRUB2							11
+#define NORMAL_MODE_MESSAGE_LIGHT							12
+#define NORMAL_MODE_MESSAGE_TILT							13
+#define NORMAL_MODE_MESSAGE_DEV1							14
+#define NORMAL_MODE_MESSAGE_DEV2							15
+#define NORMAL_MODE_MESSAGE_FLAGS1                          16
+#define NORMAL_MODE_MESSAGE_FLAGS2                          17
+#define VTL_SPEED											18
+#define VTR_SPEED											20
+#define VBL_SPEED											22
+#define VBR_SPEED											24
+#define HTL_SPEED											26
+#define HTR_SPEED											28
+#define HBL_SPEED											30
+#define HBR_SPEED											32
+/* Коэффициенты на каждый винтомотор = 8 байт
+ * Коэффициенты системы управления:
+ *     - Глубина = 2 байта
+ *     - Крен = 2 байта
+ *     - Дифферент = 2 байта
+ *     - Курс = 2 байта
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ */
 
 
-#define REQUEST_CONFIG_CODE             0x55
+#define RESPONSE_MESSAGE_LENGTH                             70
 
-#define REQUEST_CONFIG_LENGTH           151
+#define NORMAL_MODE_RESPONSE_DEPTH							0
+#define NORMAL_MODE_RESPONSE_ROLL							4
+#define NORMAL_MODE_RESPONSE_YAW							8
+#define NORMAL_MODE_RESPONSE_PITCH							12
+#define NORMAL_MODE_RESPONSE_AX								16
+#define NORMAL_MODE_RESPONSE_AY								20
 
-#define REQUEST_CONFIG_TYPE             0
+#define NORMAL_MODE_RESPONSE_THRUSTER_VTL_SPEED             24	//Vertical Top Left
+#define NORMAL_MODE_RESPONSE_THRUSTER_VTL_CURRENT           26
+#define NORMAL_MODE_RESPONSE_THRUSTER_VTL_TEMP              27
 
-#define REQUEST_CONFIG_CONST_TIME_DEPTH 1
-#define REQUEST_CONFIG_CONST_TIME_ROLL  2
-#define REQUEST_CONFIG_CONST_TIME_PITCH 3
-#define REQUEST_CONFIG_CONST_TIME_YAW   4
+#define NORMAL_MODE_RESPONSE_THRUSTER_VTR_SPEED             28	//Vertical Top Right
+#define NORMAL_MODE_RESPONSE_THRUSTER_VTR_CURRENT           30
+#define NORMAL_MODE_RESPONSE_THRUSTER_VTR_TEMP              31
 
-#define REQUEST_CONFIG_K1_DEPTH         5
-#define REQUEST_CONFIG_K2_DEPTH         9
-#define REQUEST_CONFIG_START_DEPTH      13
-#define REQUEST_CONFIG_GAIN_DEPTH       17
+#define NORMAL_MODE_RESPONSE_THRUSTER_VBL_SPEED             32	//Vertical Bottom Left
+#define NORMAL_MODE_RESPONSE_THRUSTER_VBL_CURRENT           34
+#define NORMAL_MODE_RESPONSE_THRUSTER_VBL_TEMP              35
 
-#define REQUEST_CONFIG_K1_ROLL          21
-#define REQUEST_CONFIG_K2_ROLL          25
-#define REQUEST_CONFIG_START_ROLL       29
-#define REQUEST_CONFIG_GAIN_ROLL        33
+#define NORMAL_MODE_RESPONSE_THRUSTER_VBR_SPEED             36	//Vertical Bottom Right
+#define NORMAL_MODE_RESPONSE_THRUSTER_VBR_CURRENT           38
+#define NORMAL_MODE_RESPONSE_THRUSTER_VBR_TEMP              39
 
-#define REQUEST_CONFIG_K1_PITCH         37
-#define REQUEST_CONFIG_K2_PITCH         41
-#define REQUEST_CONFIG_START_PITCH      45
-#define REQUEST_CONFIG_GAIN_PITCH       49
+#define NORMAL_MODE_RESPONSE_THRUSTER_HTL_SPEED             40	//Horizontal Top Left
+#define NORMAL_MODE_RESPONSE_THRUSTER_HTL_CURRENT           42
+#define NORMAL_MODE_RESPONSE_THRUSTER_HTL_TEMP              43
 
-#define REQUEST_CONFIG_K1_YAW           53
-#define REQUEST_CONFIG_K2_YAW           57
-#define REQUEST_CONFIG_START_YAW        61
-#define REQUEST_CONFIG_GAIN_YAW         65
+#define NORMAL_MODE_RESPONSE_THRUSTER_HTR_SPEED             44	//Horizontal Top Right
+#define NORMAL_MODE_RESPONSE_THRUSTER_HTR_CURRENT           46
+#define NORMAL_MODE_RESPONSE_THRUSTER_HTR_TEMP              47
 
-#define REQUEST_CONFIG_POSITION_HLB     69
-#define REQUEST_CONFIG_POSITION_HLF     70
-#define REQUEST_CONFIG_POSITION_HRB     71
-#define REQUEST_CONFIG_POSITION_HRF     72
-#define REQUEST_CONFIG_POSITION_VB      73
-#define REQUEST_CONFIG_POSITION_VF      74
-#define REQUEST_CONFIG_POSITION_VL      75
-#define REQUEST_CONFIG_POSITION_VR      76
+#define NORMAL_MODE_RESPONSE_THRUSTER_HBL_SPEED             48	//Horizontal Bottom Left
+#define NORMAL_MODE_RESPONSE_THRUSTER_HBL_CURRENT           50
+#define NORMAL_MODE_RESPONSE_THRUSTER_HBL_TEMP              51
 
-#define REQUEST_CONFIG_INVERSE_HLB      77
-#define REQUEST_CONFIG_INVERSE_HLF      78
-#define REQUEST_CONFIG_INVERSE_HRB      79
-#define REQUEST_CONFIG_INVERSE_HRF      80
-#define REQUEST_CONFIG_INVERSE_VB       81
-#define REQUEST_CONFIG_INVERSE_VF       82
-#define REQUEST_CONFIG_INVERSE_VL       83
-#define REQUEST_CONFIG_INVERSE_VR       84
+#define NORMAL_MODE_RESPONSE_THRUSTER_HBR_SPEED             52	//Horizontal Bottom Right
+#define NORMAL_MODE_RESPONSE_THRUSTER_HBR_CURRENT           54
+#define NORMAL_MODE_RESPONSE_THRUSTER_HBR_TEMP              55
 
-#define REQUEST_CONFIG_K_FORWARD_HLB    85
-#define REQUEST_CONFIG_K_FORWARD_HLF    89
-#define REQUEST_CONFIG_K_FORWARD_HRB    93
-#define REQUEST_CONFIG_K_FORWARD_HRF    97
-#define REQUEST_CONFIG_K_FORWARD_VB     101
-#define REQUEST_CONFIG_K_FORWARD_VF     105
-#define REQUEST_CONFIG_K_FORWARD_VL     109
-#define REQUEST_CONFIG_K_FORWARD_VR     113
+#define NORMAL_MODE_RESPONSE_GRUB1_CURRENT					56
+#define NORMAL_MODE_RESPONSE_GRUB2_CURRENT					57
+#define NORMAL_MODE_RESPONSE_DEV1_CURRENT					58
+#define NORMAL_MODE_RESPONSE_DEV2_CURRENT					59
+#define NORMAL_MODE_RESPONSE_TILT_CURRENT					60
+#define NORMAL_MODE_RESPONSE_LIGHT_CURRENT					61
 
-#define REQUEST_CONFIG_K_BACKWARD_HLB   117
-#define REQUEST_CONFIG_K_BACKWARD_HLF   121
-#define REQUEST_CONFIG_K_BACKWARD_HRB   125
-#define REQUEST_CONFIG_K_BACKWARD_HRF   129
-#define REQUEST_CONFIG_K_BACKWARD_VB    133
-#define REQUEST_CONFIG_K_BACKWARD_VF    137
-#define REQUEST_CONFIG_K_BACKWARD_VL    141
-#define REQUEST_CONFIG_K_BACKWARD_VR    145
+#define NORMAL_MODE_RESPONSE_48V							62
+#define NORMAL_MODE_RESPONSE_12V							63
+#define NORMAL_MODE_RESPONSE_5V								64
+#define NORMAL_MODE_RESPONSE_3V								65
+#define NORMAL_MODE_RESPONSE_HUMIDITY						66
 
-#define REQUEST_CONFIG_CHECKSUM         149
-
-
-
-
-#define RESPONSE_LENGTH                 20
-
-#define RESPONSE_ROLL                   0
-#define RESPONSE_PITCH                  2
-#define RESPONSE_YAW                    4
-
-#define RESPONSE_ROLL_SPEED             6
-#define RESPONSE_PITCH_SPEED            8
-#define RESPONSE_YAW_SPEED              10
-
-#define RESPONSE_TEMPERATURE            12
-#define RESPONSE_PRESSURE               14
-
-#define RESPONSE_MOTOR_ERRORS           16
-
-#define RESPONSE_CHECKSUM               18
+#define NORMAL_MODE_RESPONSE_THRUSTERS_FLAGS				67

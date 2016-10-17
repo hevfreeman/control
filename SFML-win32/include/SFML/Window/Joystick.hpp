@@ -50,7 +50,7 @@ public:
     {
         Count       = 8,  ///< Maximum number of supported joysticks
         ButtonCount = 32, ///< Maximum number of supported buttons
-        AxisCount   = 10  ///< Maximum number of supported axes
+        AxisCount   = 8   ///< Maximum number of supported axes
     };
 
     ////////////////////////////////////////////////////////////
@@ -66,9 +66,7 @@ public:
         U,    ///< The U axis
         V,    ///< The V axis
         PovX, ///< The X axis of the point-of-view hat
-        PovY,  ///< The Y axis of the point-of-view hat
-	J1,
-	J2
+        PovY  ///< The Y axis of the point-of-view hat
     };
 
     ////////////////////////////////////////////////////////////
@@ -196,7 +194,7 @@ public:
 /// SFML supports:
 /// \li 8 joysticks (sf::Joystick::Count)
 /// \li 32 buttons per joystick (sf::Joystick::ButtonCount)
-/// \li 10 axes per joystick (sf::Joystick::AxisCount)
+/// \li 8 axes per joystick (sf::Joystick::AxisCount)
 ///
 /// Unlike the keyboard or mouse, the state of joysticks is sometimes
 /// not directly available (depending on the OS), therefore an update()

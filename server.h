@@ -13,16 +13,38 @@
 #include <cstdlib>
 
 #include "joystick.h"
-#include "settings.h"
+#include "motor.h"
 
 
-#define REQUEST_DELAY					25
-#define REQUEST_TIMEOUT					25
-#define CHANGE_TYPE_TIMEOUT             200
-
-#define MESSAGES_ARRAY_SIZE             REQUEST_CONFIG_LENGTH
+#define REQUEST_DELAY					50
+#define REQUEST_TIMEOUT					50
 
 
+struct Message {
+    int16_t yaw   = 0;
+    int16_t pitch = 0;
+    int16_t marsh = 0;
+    int16_t lag   = 0;
+    int16_t depth = 0;
+
+    int8_t grub1  = 0;
+    int8_t grub2  = 0;
+    int8_t light  = 0;
+    int8_t tilt   = 0;
+    int8_t dev1   = 0;
+    int8_t dev2   = 0;
+    int8_t flags1 = 0;
+    int8_t flags2 = 0;
+
+    int16_t VF    = 0;
+    int16_t VR    = 0;
+    int16_t VB    = 0;
+    int16_t VL    = 0;
+    int16_t HRF   = 0;
+    int16_t HRB   = 0;
+    int16_t HLB   = 0;
+    int16_t HLF   = 0;
+};
 
 class Server : public QObject
 {
@@ -30,52 +52,34 @@ class Server : public QObject
 public:
     explicit Server(QObject *parent = 0);
     ~Server();
-    Joystick* j;
-
-    uint8_t msg_to_send[MESSAGES_ARRAY_SIZE];
-    QByteArray msg_in;
-
-    uint8_t nextMessageType;
-    uint8_t currentMessageType;
-
-    QTimer *sendTimer;
-
-    Settings* settings;
-
-    float temperature = 0;
+    Motor* motors;
 
 private:
+    QTimer *sendTimer;
     QSerialPort *newPort;
 
+    Message m;
+    Joystick j;
+
+    float sensitivity;
+
+    bool overrideAllSettings = false;
+
+    void writeMotor(Motor motor, uint8_t *msg_to_send);
+
     bool COMconnect(int com_name);
-
     void addCheckSumm16b(uint8_t * msg, uint16_t length);
-    uint8_t isCheckSumm16bCorrect(uint8_t * msg, uint16_t length);
 
-    void sendMessageNormal();
-    void sendMessageDirect();
-    void sendMessageConfig();
-    void receiveMessage();
-
-    void addFloat(uint8_t * msg, int position, float val);
-    void addSNP(uint8_t * msg);
-
-    float encodeTemperature(uint8_t MS, uint8_t LS);
-
-
-
+    int16_t translateCoords(float joy, float from_start, float from_end, int to_start, int to_end);
+    float translateCoords(float joy, float from_start, float from_end, float to_start, float to_end);
 signals:
-    void imSleeping();
-    void info(QString s);
 
 public slots:
-    void connect_fake();
-
+    void sendMessage();
     void connect_com();
     void disconnect_com();
 
-private slots:
-    void sendMessage();
+    void setControl(bool gui);
 };
 
 #endif // SERVER_H

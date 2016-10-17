@@ -4,11 +4,10 @@ Settings::Settings(QObject *parent) : QObject(parent)
 {
     motors = new Motor[8];
     initialize();
-    //loadFromJSONFile();
+    loadFromJSONFile();
 }
 
 void Settings::initialize() {
-    std::cout << "Setting default config" << std::endl;
     for (int i = 0; i < 8; ++i) {
         motors[i].code = Motor::MotorCode::VF;
         motors[i].adress = i;
@@ -19,8 +18,6 @@ void Settings::initialize() {
         motors[i].k_forward = 1.;
     }
 }
-
-
 
 void Settings::read(const QJsonObject &json)
 {
@@ -43,42 +40,10 @@ void Settings::read(const QJsonObject &json)
             std::cout << std::endl;
         } else {
             std::cout << "Wrong slot order in JSON file" << std::endl;
-            std::cout << i << " expected, " << motorObject["slot"].toInt() << " got." << std::endl;
+            std::cout << "Wrong slot order in JSON file" << std::endl;
         }
 
     }
-
-    QJsonObject stabilization_json = json["stabilization"].toObject();
-
-    QJsonObject depth_json  = stabilization_json["depth"].toObject();
-    QJsonObject roll_json   = stabilization_json["roll"].toObject();
-    QJsonObject pitch_json  = stabilization_json["pitch"].toObject();
-    QJsonObject yaw_json    = stabilization_json["yaw"].toObject();
-
-    depth.k1         = depth_json["k1"].toDouble();
-    depth.k2         = depth_json["k2"].toDouble();
-    depth.start      = depth_json["start"].toDouble();
-    depth.gain       = depth_json["gain"].toDouble();
-    depth.const_time = depth_json["const_time"].toBool();
-
-    roll.k1         = roll_json["k1"].toDouble();
-    roll.k2         = roll_json["k2"].toDouble();
-    roll.start      = roll_json["start"].toDouble();
-    roll.gain       = roll_json["gain"].toDouble();
-    roll.const_time = roll_json["const_time"].toBool();
-
-    pitch.k1         = pitch_json["k1"].toDouble();
-    pitch.k2         = pitch_json["k2"].toDouble();
-    pitch.start      = pitch_json["start"].toDouble();
-    pitch.gain       = pitch_json["gain"].toDouble();
-    pitch.const_time = pitch_json["const_time"].toBool();
-
-    yaw.k1         = yaw_json["k1"].toDouble();
-    yaw.k2         = yaw_json["k2"].toDouble();
-    yaw.start      = yaw_json["start"].toDouble();
-    yaw.gain       = yaw_json["gain"].toDouble();
-    yaw.const_time = yaw_json["const_time"].toBool();
-
 }
 
 void Settings::write(QJsonObject &json) const
@@ -99,50 +64,11 @@ void Settings::write(QJsonObject &json) const
     }
 
     json["motors"] = motorArray;
-
-    QJsonObject depth_json;
-    QJsonObject roll_json;
-    QJsonObject pitch_json;
-    QJsonObject yaw_json;
-
-
-    depth_json["k1"]        = depth.k1;
-    depth_json["k2"]        = depth.k2;
-    depth_json["start"]     = depth.start;
-    depth_json["gain"]      = depth.gain;
-    depth_json["const_time"] = depth.const_time;
-
-    roll_json["k1"]         = roll.k1;
-    roll_json["k2"]         = roll.k2;
-    roll_json["start"]      = roll.start;
-    roll_json["gain"]       = roll.gain;
-    roll_json["const_time"] = roll.const_time;
-
-    pitch_json["k1"]        = pitch.k1;
-    pitch_json["k2"]        = pitch.k2;
-    pitch_json["start"]     = pitch.start;
-    pitch_json["gain"]      = pitch.gain;
-    pitch_json["const_time"] = pitch.const_time;
-
-    yaw_json["k1"]          = yaw.k1;
-    yaw_json["k2"]          = yaw.k2;
-    yaw_json["start"]       = yaw.start;
-    yaw_json["gain"]        = yaw.gain;
-    yaw_json["const_time"]  = yaw.const_time;
-
-    QJsonObject stabilization_json;
-
-    stabilization_json["depth"] = depth_json;
-    stabilization_json["roll"]  = roll_json;
-    stabilization_json["pitch"] = pitch_json;
-    stabilization_json["yaw"]   = yaw_json;
-
-    json["stabilization"] = stabilization_json;
 }
 
 
 bool Settings::loadFromJSONFile() {
-    QFile loadFile("config.json");
+    QFile loadFile("save.json");
 
     if (!loadFile.open(QIODevice::ReadOnly)) {
         qWarning("Couldn't open save file.");
@@ -160,7 +86,7 @@ bool Settings::loadFromJSONFile() {
 
 
 bool Settings::saveToJSONFIle() const{
-    QFile saveFile("config.json");
+    QFile saveFile("save.json");
 
     if (!saveFile.open(QIODevice::WriteOnly)) {
         std::cout << "Couldn't open save file." << std::endl;
@@ -176,6 +102,9 @@ bool Settings::saveToJSONFIle() const{
 }
 
 void Settings::changeMotorSetting(int slot, QString motorID, bool inverse) {
+    //motors[slot].setCode(motorID);
+    //motors[slot].inverse = inverse;
+
     saveToJSONFIle();
     loadFromJSONFile();
     std::cout << "Motor " << motorID.toStdString() << " is now binded to " << slot << " slot"
